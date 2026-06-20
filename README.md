@@ -18,8 +18,6 @@ PORT=8000
 DATABASE_URL=postgresql://admin:admin@localhost:5432/oidc_auth
 ```
 
-Port `8000` is recommended because macOS may already use port `5000`.
-
 ## Database
 
 Start PostgreSQL with Docker:
