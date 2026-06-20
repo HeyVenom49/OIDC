@@ -7,7 +7,8 @@
     "db:migrate": "drizzle-kit migrate",
     "db:generate": "drizzle-kit generate",
     "db:studio": "drizzle-kit studio",
-    "dev": "tsc-watch --onSuccess \"node dist/index\""
+    "dev": "tsx watch src/index.ts",
+    "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
     "@types/bun": "latest",
@@ -25,7 +26,7 @@
   },
   "dependencies": {
     "dotenv": "^17.4.2",
-    "drizzle": "^1.4.0",
+    "drizzle-orm": "^0.45.1",
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",
     "node-jose": "^2.2.0",
