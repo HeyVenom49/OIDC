@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OAuth Demo Client</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: #f4f4f5;
+            color: #18181b;
+            padding: 24px;
+        }
+
+        main {
+            max-width: 720px;
+            margin: 0 auto;
+            background: #fff;
+            border: 1px solid #e4e4e7;
+            border-radius: 8px;
+            padding: 24px;
+        }
+
+        h1,
+        h2 {
+            margin: 0 0 12px;
+        }
+
+        p {
+            color: #52525b;
+            line-height: 1.5;
+        }
+
+        label {
+            display: block;
+            margin: 14px 0 6px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        input {
+            width: 100%;
+            height: 40px;
+            border: 1px solid #d4d4d8;
+            border-radius: 6px;
+            padding: 0 10px;
+            font: inherit;
+        }
+
+        button {
+            height: 40px;
+            margin-top: 18px;
+            border: 0;
+            border-radius: 6px;
+            background: #18181b;
+            color: #fff;
+            font: inherit;
+            font-weight: 600;
+            cursor: pointer;
+            padding: 0 16px;
+        }
+
+        button.secondary {
+            background: #fff;
+            color: #18181b;
+            border: 1px solid #d4d4d8;
+            margin-left: 8px;
+        }
+
+        pre {
+            margin: 12px 0 0;
+            padding: 12px;
+            background: #fafafa;
+            border: 1px solid #e4e4e7;
+            border-radius: 6px;
+            overflow: auto;
+            white-space: pre-wrap;
+            word-break: break-word;
+            font-size: 13px;
+        }
+
+        .error {
+            margin-top: 16px;
+            padding: 12px;
+            border-radius: 6px;
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            color: #991b1b;
+        }
+
+        .success {
+            margin-top: 24px;
+        }
+    </style>
+</head>
+
+<body>
+    <main>
+        <h1>OAuth Demo Client</h1>
+        <p>
+            Register an app at <a href="/admin/applications">/admin/applications</a> and use this page URL as the
+            redirect URI.
+        </p>
+
+        <form id="clientForm">
+            <label for="clientId">Client ID</label>
+            <input id="clientId" name="clientId" required />
+
+            <label for="clientSecret">Client Secret</label>
+            <input id="clientSecret" name="clientSecret" required />
+
+            <label for="redirectUri">Redirect URI</label>
+            <input id="redirectUri" name="redirectUri" type="url" required />
+
+            <button type="submit">Sign in with OAuth</button>
+            <button type="button" class="secondary" id="clearButton">Clear saved config</button>
+        </form>
+
+        <div id="error" class="error" hidden></div>
+        <section id="result" class="success" hidden>
+            <h2>OAuth response</h2>
+            <pre id="tokenOutput"></pre>
+            <h2>User info</h2>
+            <pre id="userinfoOutput"></pre>
+        </section>
+    </main>
+
+    <script>
+        const STORAGE_KEY = "oidc-oauth-demo-config";
+        const form = document.getElementById("clientForm");
+        const errorBox = document.getElementById("error");
+        const result = document.getElementById("result");
+        const tokenOutput = document.getElementById("tokenOutput");
+        const userinfoOutput = document.getElementById("userinfoOutput");
+        const clearButton = document.getElementById("clearButton");
+        const params = new URLSearchParams(window.location.search);
+
+        function loadConfig() {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (!saved) {
+                document.getElementById("redirectUri").value = `${window.location.origin}/oauth-demo.html`;
+                return;
+            }
+
+            const config = JSON.parse(saved);
+            document.getElementById("clientId").value = config.clientId ?? "";
+            document.getElementById("clientSecret").value = config.clientSecret ?? "";
+            document.getElementById("redirectUri").value =
+                config.redirectUri ?? `${window.location.origin}/oauth-demo.html`;
+        }
+
+        function saveConfig(config) {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+        }
+
+        function showError(message) {
+            errorBox.hidden = false;
+            errorBox.textContent = message;
+        }
+
+        function hideError() {
+            errorBox.hidden = true;
+        }
+
+        async function exchangeCode(config, code) {
+            const body = new URLSearchParams({
+                grant_type: "authorization_code",
+                code,
+                redirect_uri: config.redirectUri,
+                client_id: config.clientId,
+                client_secret: config.clientSecret,
+            });
+
+            const response = await fetch("/o/token", {
+                method: "POST",
+                headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                body,
+            });
+
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(data.message || "Token exchange failed.");
+            }
+
+            return data;
+        }
+
+        async function fetchUserInfo(accessToken) {
+            const response = await fetch("/o/userinfo", {
+                headers: { Authorization: `Bearer ${accessToken}` },
+            });
+
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(data.message || "Userinfo request failed.");
+            }
+
+            return data;
+        }
+
+        form.addEventListener("submit", (event) => {
+            event.preventDefault();
+            hideError();
+
+            const config = {
+                clientId: document.getElementById("clientId").value.trim(),
+                clientSecret: document.getElementById("clientSecret").value.trim(),
+                redirectUri: document.getElementById("redirectUri").value.trim(),
+            };
+
+            saveConfig(config);
+
+            const state = crypto.randomUUID();
+            const nonce = crypto.randomUUID();
+            sessionStorage.setItem("oauth-demo-state", state);
+
+            const authorizeUrl = new URL("/o/authenticate", window.location.origin);
+            authorizeUrl.searchParams.set("client_id", config.clientId);
+            authorizeUrl.searchParams.set("redirect_uri", config.redirectUri);
+            authorizeUrl.searchParams.set("response_type", "code");
+            authorizeUrl.searchParams.set("scope", "openid profile email");
+            authorizeUrl.searchParams.set("state", state);
+            authorizeUrl.searchParams.set("nonce", nonce);
+
+            window.location.href = authorizeUrl.toString();
+        });
+
+        clearButton.addEventListener("click", () => {
+            localStorage.removeItem(STORAGE_KEY);
+            form.reset();
+            document.getElementById("redirectUri").value = `${window.location.origin}/oauth-demo.html`;
+            result.hidden = true;
+            hideError();
+        });
+
+        async function handleCallback() {
+            const code = params.get("code");
+            const state = params.get("state");
+            const savedState = sessionStorage.getItem("oauth-demo-state");
+
+            if (!code) {
+                return;
+            }
+
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (!saved) {
+                showError("Missing saved client config. Enter your client credentials and try again.");
+                return;
+            }
+
+            if (!state || state !== savedState) {
+                showError("Invalid OAuth state.");
+                return;
+            }
+
+            try {
+                const config = JSON.parse(saved);
+                const tokens = await exchangeCode(config, code);
+                const userinfo = await fetchUserInfo(tokens.access_token);
+
+                tokenOutput.textContent = JSON.stringify(tokens, null, 2);
+                userinfoOutput.textContent = JSON.stringify(userinfo, null, 2);
+                result.hidden = false;
+
+                const cleanUrl = new URL(window.location.href);
+                cleanUrl.search = "";
+                window.history.replaceState({}, "", cleanUrl.toString());
+            } catch (error) {
+                showError(error.message || "OAuth callback failed.");
+            }
+        }
+
+        loadConfig();
+        handleCallback();
+    </script>
+</body>
+
+</html>

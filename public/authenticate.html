@@ -296,7 +296,7 @@
         </form>
 
         <div class="footer">
-            Don't have an account? <a href="/signup.html">Sign up</a>
+            Don't have an account? <a id="signupLink" href="/signup.html">Sign up</a>
         </div>
     </div>
 
@@ -308,6 +308,7 @@
         const errorMsg = document.getElementById('errorMsg');
 
         const params = new URLSearchParams(window.location.search);
+        document.getElementById('signupLink').href = `/signup.html${window.location.search}`;
 
         function showError(msg) {
             errorMsg.textContent = msg;
@@ -349,6 +350,7 @@
                         redirect_uri: params.get('redirect_uri'),
                         state: params.get('state'),
                         nonce: params.get('nonce'),
+                        scope: params.get('scope'),
                     }),
                 });
 

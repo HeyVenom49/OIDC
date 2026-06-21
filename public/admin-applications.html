@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Register Application</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: grid;
+            place-items: center;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: #f4f4f5;
+            color: #18181b;
+            padding: 24px;
+        }
+
+        main {
+            width: min(100%, 440px);
+            background: #fff;
+            border: 1px solid #e4e4e7;
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 1px 2px rgb(0 0 0 / 0.06);
+        }
+
+        h1 {
+            margin: 0 0 20px;
+            font-size: 24px;
+        }
+
+        label {
+            display: block;
+            margin: 14px 0 6px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        input {
+            width: 100%;
+            height: 40px;
+            border: 1px solid #d4d4d8;
+            border-radius: 6px;
+            padding: 0 10px;
+            font: inherit;
+        }
+
+        button {
+            width: 100%;
+            height: 40px;
+            margin-top: 18px;
+            border: 0;
+            border-radius: 6px;
+            background: #18181b;
+            color: #fff;
+            font: inherit;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        section {
+            margin-top: 20px;
+            padding: 14px;
+            border-radius: 6px;
+        }
+
+        .success {
+            background: #ecfdf5;
+            border: 1px solid #bbf7d0;
+        }
+
+        .error {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            color: #991b1b;
+        }
+
+        code {
+            display: block;
+            overflow-wrap: anywhere;
+            margin-top: 6px;
+            color: #14532d;
+        }
+    </style>
+</head>
+
+<body>
+    <main>
+        <h1>Register Application</h1>
+
+        <form id="applicationForm">
+            <label for="displayName">Application Display Name</label>
+            <input id="displayName" name="displayName" required />
+
+            <label for="applicationUrl">Application URL</label>
+            <input id="applicationUrl" name="applicationUrl" type="url" required />
+
+            <label for="redirectUri">Redirect URL</label>
+            <input id="redirectUri" name="redirectUri" type="url" required />
+
+            <button type="submit" id="submitButton">Create Application</button>
+        </form>
+
+        <section id="result" hidden></section>
+    </main>
+
+    <script>
+        const form = document.getElementById("applicationForm");
+        const result = document.getElementById("result");
+        const submitButton = document.getElementById("submitButton");
+
+        function showResult(html, isError = false) {
+            result.hidden = false;
+            result.className = isError ? "error" : "success";
+            result.innerHTML = html;
+        }
+
+        form.addEventListener("submit", async (event) => {
+            event.preventDefault();
+            submitButton.disabled = true;
+            submitButton.textContent = "Creating...";
+
+            try {
+                const response = await fetch("/admin/applications", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(Object.fromEntries(new FormData(form))),
+                });
+                const data = await response.json().catch(() => ({}));
+
+                if (!response.ok) {
+                    showResult(data.message || "Unable to create application.", true);
+                    return;
+                }
+
+                showResult(`
+                    <strong>Application created</strong>
+                    <code>client_id: ${data.clientId}</code>
+                    <code>client_secret: ${data.clientSecret}</code>
+                `);
+                form.reset();
+            } catch {
+                showResult("Unable to create application.", true);
+            } finally {
+                submitButton.disabled = false;
+                submitButton.textContent = "Create Application";
+            }
+        });
+    </script>
+</body>
+
+</html>
